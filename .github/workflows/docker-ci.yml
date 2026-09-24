@@ -1,31 +1,40 @@
-name: Docker CI
+name: Docker CI/CD
 
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
-  docker-build:
+  docker-build-push:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::683604925197:role/GitHubActionsECRRole
+          aws-region: eu-north-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build Docker image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v7
         with:
           context: .
-          push: false
-          tags: aws-devops-project:ci
-      - name: Show GitHub repository IDs
-        run: |
-          echo "OWNER_ID=${{ github.repository_owner_id }}"
-          echo "REPOSITORY_ID=${{ github.repository_id }}"
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/aws-devops-project:latest
+            ${{ steps.login-ecr.outputs.registry }}/aws-devops-project:${{ github.sha }}
